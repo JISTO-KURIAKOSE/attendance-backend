@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import pytz 
 import qrcode
-from io import BytesIO  # Standard library for handling image data in memory
+from io import BytesIO 
 import models
 from database import SessionLocal, engine
 
@@ -26,8 +26,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173", 
         "http://127.0.0.1:5173", 
-        "https://attendance-tracker-frontend-psi.vercel.app", # Your Production URL
-        "*" # Allows connectivity during testing
+        "https://attendance-tracker-frontend-psi.vercel.app",
+        "*" 
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -41,6 +41,24 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# --- NEW: ATTENDANCE COUNT (Fixes 404 /attendance) ---
+@app.get("/attendance")
+def get_attendance_count(db: Session = Depends(get_db)):
+    # This counts rows marked 'Present' for the dashboard
+    count = db.query(models.AttendanceRecord).filter(models.AttendanceRecord.status == "Present").count()
+    return {"count": count}
+
+# --- NEW: MONTH SUMMARY (Fixes 404 /attendance/month-summary) ---
+@app.get("/attendance/month-summary")
+def get_month_summary(db: Session = Depends(get_db)):
+    records = db.query(models.AttendanceRecord).all()
+    summary = {}
+    for r in records:
+        if r.sign_in:
+            date_key = r.sign_in.strftime("%Y-%m-%d")
+            summary[date_key] = r.status
+    return summary
 
 # --- STUDENT: SIGN IN ---
 @app.post("/attendance/signin")
@@ -128,16 +146,11 @@ def update_status(record_id: int, action: dict, db: Session = Depends(get_db)):
 # --- QR CODE GENERATION ---
 @app.get("/attendance/qrcode")
 def get_qrcode():
-    # This URL is what the student's phone will open after scanning
     data = "https://attendance-tracker-frontend-psi.vercel.app/tracker" 
-    
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(data)
     qr.make(fit=True)
-    
-    # Needs 'pillow' installed in requirements.txt
     img = qr.make_image(fill_color="black", back_color="white")
-    
     buf = BytesIO()
     img.save(buf)
     buf.seek(0)
