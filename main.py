@@ -42,14 +42,14 @@ def get_db():
     finally:
         db.close()
 
-# --- NEW: ATTENDANCE COUNT (Fixes 404 /attendance) ---
+# --- NEW: ATTENDANCE COUNT (Fixes Dashboard Stats) ---
 @app.get("/attendance")
 def get_attendance_count(db: Session = Depends(get_db)):
-    # This counts rows marked 'Present' for the dashboard
+    # Counts rows marked 'Present'
     count = db.query(models.AttendanceRecord).filter(models.AttendanceRecord.status == "Present").count()
     return {"count": count}
 
-# --- NEW: MONTH SUMMARY (Fixes 404 /attendance/month-summary) ---
+# --- NEW: MONTH SUMMARY (Fixes Calendar/History View) ---
 @app.get("/attendance/month-summary")
 def get_month_summary(db: Session = Depends(get_db)):
     records = db.query(models.AttendanceRecord).all()
@@ -74,7 +74,7 @@ def sign_in(data: dict, db: Session = Depends(get_db)):
     db.refresh(new_record)
     return {"record_id": new_record.id, "message": "Clocked In (Toronto Time)"}
 
-# --- STUDENT: SIGN OUT ---
+# --- STUDENT: SIGN OUT (UPDATED TO 10 MINS) ---
 @app.post("/attendance/signout/{record_id}")
 def sign_out(record_id: int, db: Session = Depends(get_db)):
     record = db.query(models.AttendanceRecord).filter(models.AttendanceRecord.id == record_id).first()
@@ -89,7 +89,9 @@ def sign_out(record_id: int, db: Session = Depends(get_db)):
     minutes, _ = divmod(remainder, 60)
     
     record.total_hours = f"{hours}h {minutes}m"
-    record.status = "Present" if (hours > 0 or minutes >= 45) else "Shortage"
+    
+    # Logic: Mark Present if at least 10 minutes worked
+    record.status = "Present" if (hours > 0 or minutes >= 10) else "Shortage"
     
     db.commit()
     return {"status": record.status, "duration": record.total_hours}
