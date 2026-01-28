@@ -153,11 +153,14 @@ def update_status(record_id: int, action: dict, db: Session = Depends(get_db)):
 # --- QR CODE ---
 @app.get("/attendance/qrcode")
 def get_qrcode():
-    data = "http://192.168.1.7:5173/tracker" # Updated for Vite port
+    # Update this to your LIVE Vercel URL
+    data = "https://attendance-tracker-frontend-psi.vercel.app/tracker" 
+    
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(data)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
+    
     buf = BytesIO()
     img.save(buf)
     buf.seek(0)
